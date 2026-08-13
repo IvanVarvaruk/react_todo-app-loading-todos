@@ -4,13 +4,19 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { UserWarning } from './UserWarning';
 import * as todoApi from './api/todos';
 import { Todo } from './types/Todo';
-import classNames from 'classnames';
+import { StatusFilter, ErrorMessage } from './types/enums';
+import { Header } from './components/Header';
+import { TodoList } from './components/TodoList';
+import { Footer } from './components/Footer';
+import { ErrorNotification } from './components/ErrorNotification';
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [filter, setFilter] = useState<string>('all');
+  const [errorMessage, setErrorMessage] = useState<ErrorMessage>(
+    ErrorMessage.None,
+  );
+  const [filter, setFilter] = useState<StatusFilter>(StatusFilter.All);
 
   useEffect(() => {
     if (!errorMessage) {
@@ -18,20 +24,20 @@ export const App: React.FC = () => {
     }
 
     const timer = setTimeout(() => {
-      setErrorMessage('');
+      setErrorMessage(ErrorMessage.None);
     }, 3000);
 
     return () => clearTimeout(timer);
   }, [errorMessage]);
 
   const loadTodos = () => {
-    setErrorMessage('');
+    setErrorMessage(ErrorMessage.None);
     todoApi
       .getTodos()
       .then(fetchedTodos => {
         setTodos(fetchedTodos);
       })
-      .catch(() => setErrorMessage('Unable to load todos'));
+      .catch(() => setErrorMessage(ErrorMessage.Load));
   };
 
   useEffect(() => {
@@ -40,11 +46,11 @@ export const App: React.FC = () => {
 
   const visibleTodos = useMemo(() => {
     return todos.filter(todo => {
-      if (filter === 'active') {
+      if (filter === StatusFilter.Active) {
         return !todo.completed;
       }
 
-      if (filter === 'completed') {
+      if (filter === StatusFilter.Completed) {
         return todo.completed;
       }
 
@@ -60,6 +66,32 @@ export const App: React.FC = () => {
     return todos.filter(todo => todo.completed).length;
   }, [todos]);
 
+  const handleFormSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const trimmedTitle = inputValue.trim();
+
+    if (!trimmedTitle) {
+      setErrorMessage(ErrorMessage.EmptyTitle);
+
+      return;
+    }
+
+    setErrorMessage(ErrorMessage.None);
+    todoApi
+      .addTodo({
+        userId: todoApi.USER_ID,
+        title: trimmedTitle,
+        completed: false,
+      })
+      .then(newTodo => {
+        setTodos(prev => [...prev, newTodo]);
+        setInputValue('');
+      })
+      .catch(() => {
+        setErrorMessage(ErrorMessage.Add);
+      });
+  };
+
   if (!todoApi.USER_ID) {
     return <UserWarning />;
   }
@@ -69,168 +101,29 @@ export const App: React.FC = () => {
       <h1 className="todoapp__title">todos</h1>
 
       <div className="todoapp__content">
-        <header className="todoapp__header">
-          {todos.length > 0 && (
-            <button
-              type="button"
-              className="todoapp__toggle-all active"
-              data-cy="ToggleAllButton"
-            />
-          )}
-
-          <form
-            onSubmit={event => {
-              event.preventDefault();
-              const trimmedTitle = inputValue.trim();
-
-              if (!trimmedTitle) {
-                setErrorMessage('Title should not be empty');
-
-                return;
-              }
-
-              setErrorMessage('');
-              todoApi
-                .addTodo({
-                  userId: todoApi.USER_ID,
-                  title: trimmedTitle,
-                  completed: false,
-                })
-                .then(newTodo => {
-                  setTodos(prev => [...prev, newTodo]);
-                  setInputValue('');
-                })
-                .catch(() => {
-                  setErrorMessage('Unable to add a todo');
-                });
-            }}
-          >
-            <input
-              data-cy="NewTodoField"
-              type="text"
-              className="todoapp__new-todo"
-              placeholder="What needs to be done?"
-              value={inputValue}
-              onChange={event => setInputValue(event.target.value)}
-              autoFocus
-            />
-          </form>
-        </header>
-
-        {todos.length > 0 && (
-          <section className="todoapp__main" data-cy="TodoList">
-            {visibleTodos.map(todo => (
-              <div
-                key={todo.id}
-                data-cy="Todo"
-                className={classNames('todo', {
-                  completed: todo.completed,
-                })}
-              >
-                <label className="todo__status-label">
-                  <input
-                    data-cy="TodoStatus"
-                    type="checkbox"
-                    className="todo__status"
-                    checked={todo.completed}
-                  />
-                </label>
-
-                <span data-cy="TodoTitle" className="todo__title">
-                  {todo.title}
-                </span>
-
-                <button
-                  type="button"
-                  className="todo__remove"
-                  data-cy="TodoDelete"
-                >
-                  ×
-                </button>
-
-                <div data-cy="TodoLoader" className="modal overlay">
-                  <div className="modal-background has-background-white-ter" />
-                  <div className="loader" />
-                </div>
-              </div>
-            ))}
-          </section>
-        )}
-
-        {todos.length > 0 && (
-          <footer className="todoapp__footer" data-cy="Footer">
-            <span className="todo-count" data-cy="TodosCounter">
-              {`${activeCount} items left`}
-            </span>
-
-            <nav className="filter" data-cy="Filter">
-              <a
-                href="#/"
-                className={classNames('filter__link', {
-                  selected: filter === 'all',
-                })}
-                data-cy="FilterLinkAll"
-                onClick={() => setFilter('all')}
-              >
-                All
-              </a>
-
-              <a
-                href="#/active"
-                className={classNames('filter__link', {
-                  selected: filter === 'active',
-                })}
-                data-cy="FilterLinkActive"
-                onClick={() => setFilter('active')}
-              >
-                Active
-              </a>
-
-              <a
-                href="#/completed"
-                className={classNames('filter__link', {
-                  selected: filter === 'completed',
-                })}
-                data-cy="FilterLinkCompleted"
-                onClick={() => setFilter('completed')}
-              >
-                Completed
-              </a>
-            </nav>
-
-            {completedCount > 0 && (
-              <button
-                type="button"
-                className="todoapp__clear-completed"
-                data-cy="ClearCompletedButton"
-              >
-                Clear completed
-              </button>
-            )}
-          </footer>
-        )}
-      </div>
-
-      <div
-        data-cy="ErrorNotification"
-        className={classNames(
-          'notification',
-          'is-danger',
-          'is-light',
-          'has-text-weight-normal',
-          {
-            hidden: !errorMessage,
-          },
-        )}
-      >
-        <button
-          data-cy="HideErrorButton"
-          type="button"
-          className="delete"
-          onClick={() => setErrorMessage('')}
+        <Header
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onSubmit={handleFormSubmit}
+          hasTodos={todos.length > 0}
         />
-        {errorMessage}
+
+        {todos.length > 0 && <TodoList todos={visibleTodos} />}
+
+        {todos.length > 0 && (
+          <Footer
+            activeCount={activeCount}
+            completedCount={completedCount}
+            filter={filter}
+            setFilter={setFilter}
+          />
+        )}
       </div>
+
+      <ErrorNotification
+        errorMessage={errorMessage}
+        setErrorMessage={setErrorMessage}
+      />
     </div>
   );
 };
