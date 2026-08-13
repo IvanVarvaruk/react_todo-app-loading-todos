@@ -6,22 +6,9 @@ import * as todoApi from './api/todos';
 import { Todo } from './types/Todo';
 import classNames from 'classnames';
 
-const filterTodos = (unfilteredTodos: Todo[], filterParam: string): Todo[] => {
-  const filteredTodos: Todo[] = [...unfilteredTodos];
-
-  return filteredTodos.filter(todo => {
-    return filterParam === 'active'
-      ? todo.completed === false
-      : filterParam === 'completed'
-        ? todo.completed === true
-        : true;
-  });
-};
-
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [filter, setFilter] = useState<string>('all');
 
@@ -44,8 +31,7 @@ export const App: React.FC = () => {
       .then(fetchedTodos => {
         setTodos(fetchedTodos);
       })
-      .catch(() => setErrorMessage('Unable to load todos'))
-      .finally(() => setLoading(false));
+      .catch(() => setErrorMessage('Unable to load todos'));
   };
 
   useEffect(() => {
